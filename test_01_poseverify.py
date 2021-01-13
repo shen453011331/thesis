@@ -57,7 +57,6 @@ def get_ploar(img1, img2):
     pts1 = np.float32(pts1)
     pts2 = np.float32(pts2)
     F, mask = cv2.findFundamentalMat(pts1, pts2, cv2.FM_LMEDS)
-
     # we select only inlier points
     pts1 = pts1[mask.ravel() == 1]
     pts2 = pts2[mask.ravel() == 1]
@@ -93,13 +92,14 @@ def get_ploar(img1, img2):
 
     plt.subplot(121), plt.imshow(img5)
     plt.subplot(122), plt.imshow(img3)
-    plt.show()
+    # plt.show()
+    return F
 
 
 def plot_polar(base_path, img_name_1, img_name_2, pose):
     img_1 = cv2.imread(os.path.join(base_path, img_name_1), cv2.IMREAD_GRAYSCALE)
     img_2 = cv2.imread(os.path.join(base_path, img_name_2), cv2.IMREAD_GRAYSCALE)
-    get_ploar(img_1, img_2)
+    return get_ploar(img_1, img_2)
     # print('show image 1')
     # cv2.namedWindow('img_1', 0)
     # loc = cv2.setMouseCallback('img_1', on_EVENT_LBUTTONDOWN)
@@ -114,8 +114,22 @@ def plot_polar(base_path, img_name_1, img_name_2, pose):
 
 def get_essitial_matrix(pose):
     t = pose[3:]
-    r = R.from_eular(pose[:3], 'zxy')
+    angles = pose[:3][::-1]
+    r = R.from_euler('zxy', pose[:3][::-1], degrees=False)
+    mat = r.as_matrix()
+    t_x = np.array([[0, -t[2], t[1]],
+                    [t[2], 0, -t[0]],
+                    [-t[1], t[0], 0]])
+    return np.matmul(t_x, mat)
 
+def get_fundmental_matrix(intrisic, E):
+    K_inv = np.linalg.inv(intrisic.Matrix)
+    return np.matmul(K_inv.T, np.matmul(E, K_inv))
+
+
+def get_E_from_F(intrisic, F):
+    K = intrisic.Matrix
+    return np.matmul(K.T, np.matmul(F, K))
 
 def on_EVENT_LBUTTONDOWN(event, x, y, flags, param):
     if event == cv2.EVENT_LBUTTONDOWN:
@@ -155,12 +169,23 @@ def rgb_read(filename):
 
 
 
-if __name__ == '__main__':
-    txt_file = os.path.join('D:\download\lidar_data_0107', '0107_true_pose.txt')
-    base_path = 'D:\FULL_KITTI_PAN'
-    img_name_1, img_name_2, pose = read_txt(txt_file, 0)
-    base_para_path = 'D:\download\lidar_data_0107'
-    cam_in_para_new, cam_ex_para = read_parameters(os.path.join(base_para_path, 'intrinsic_1207_refine.txt'),
-                                                   os.path.join(base_para_path, 'extrinsic.txt'))
-
-    plot_polar(base_path, img_name_1, img_name_2, pose)
+# if __name__ == '__main__':
+#     txt_file = os.path.join('D:\download\lidar_data_0107', '0107_true_pose_inv_rot.txt')
+#     base_path = 'D:\FULL_KITTI_PAN'
+#     img_name_1, img_name_2, pose = read_txt(txt_file, 0)
+#     base_para_path = 'D:\download\lidar_data_0107'
+#     cam_in_para_new, cam_ex_para = read_parameters(os.path.join(base_para_path, 'intrinsic_1207_refine.txt'),
+#                                                    os.path.join(base_para_path, 'extrinsic.txt'))
+#     print(get_essitial_matrix(pose))
+#     # print(get_fundmental_matrix(cam_in_para_new, get_essitial_matrix(pose)))
+#     # [[-2.46643314e-11 - 1.97299994e-08  1.62818469e-05]
+#     #  [1.97328147e-08 - 3.05037344e-11 - 1.52616332e-05]
+#     #  [-1.62006179e-05  1.51552404e-05  5.84976699e-05]]
+#
+#     F = plot_polar(base_path, img_name_1, img_name_2, pose)
+#     # [[-7.25342006e-08  6.09158761e-05 - 6.80481225e-02]
+#     #  [-6.02010691e-05  4.84512499e-07  4.66516704e-02]
+#     # [6.72866208e-02 - 4.80743440e-02    1.00000000e+00]]
+#     print(get_E_from_F(cam_in_para_new, F))
+#
+#     #结果，确实存在问题，但是暂时不解决
